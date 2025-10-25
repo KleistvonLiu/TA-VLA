@@ -75,7 +75,6 @@ Note: These torque-handling implementations have only been tested on $π_0$ and 
 ## Dataset
 As in the original openpi implementation, we use datasets in the standard **lerobot** format.
 The difference is that we expect an additional field `observation.effort` storing the per-frame joint torque, analogous to how `observation.state` stores per-frame joint angles.
-We provide a sample dataset for the button-pressing task [here](https://huggingface.co/datasets/destroy314/agilex_push_button).
 
 ## Training
 Refer to the example configurations provided in `src/openpi/training/config.py`.
