@@ -852,10 +852,10 @@ _CONFIGS = [
     ),
     TrainConfig(
         name="pi0_lora_effort_history",
-        model=pi0.Pi0Config(paligemma_variant="gemma_2b_lora", action_expert_variant="gemma_300m_lora", effort_type=EffortType.EXPERT_HIS_C),
+        model=pi0.Pi0Config(paligemma_variant="gemma_2b", action_expert_variant="gemma_300m", effort_type=EffortType.EXPERT_HIS_C),
         data=LeRobotTavlaDataConfig(
             repo_id="org/repo",
-            effort_history=tuple((4*i-36 for i in range(10))), # sample 10 frames in 2s
+            effort_history=tuple((6*i-54 for i in range(10))), # sample 10 frames in 2s
             default_prompt="do something",
 
             base_config=DataConfig(
@@ -865,7 +865,7 @@ _CONFIGS = [
         weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_base/params"),
         num_train_steps=30_000,
         freeze_filter=pi0.Pi0Config(
-            paligemma_variant="gemma_2b_lora", action_expert_variant="gemma_300m_lora"
+            paligemma_variant="gemma_2b", action_expert_variant="gemma_300m"
         ).get_freeze_filter(),
         ema_decay=None,
     ),
