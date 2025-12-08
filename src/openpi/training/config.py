@@ -856,7 +856,7 @@ _CONFIGS = [
         data=LeRobotTavlaDataConfig(
             repo_id="org/repo",
             effort_history=tuple((6*i-54 for i in range(10))), # sample 10 frames in 2s
-            default_prompt="do something",
+            default_prompt="Pick up the PCB board from the conveyor belt and place it into the yellow container.",
 
             base_config=DataConfig(
                 local_files_only=True, # Set to True for local-only datasets.
