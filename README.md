@@ -98,5 +98,14 @@ If you find this project useful, feel free to cite our work!
 }
 ```
 
+GIT_LFS_SKIP_SMUDGE=1 NCCL_NVLS_ENABLE=0 uv run scripts/train.py pi0_lora_effort_history --exp-name=/jedata/jemotor/model/1208_TAVLA_test --data.repo_id=lerobot/test --no_wandb_enabled --overwrite
 
 
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 \
+NCCL_DEBUG=INFO \
+NCCL_ASYNC_ERROR_HANDLING=1 \
+NCCL_IB_DISABLE=1 \
+NCCL_P2P_DISABLE=1 \
+NCCL_SHM_DISABLE=1 \
+NCCL_NVLS_ENABLE=0 \
+uv run scripts/train.py pi0_lora_effort_history --exp-name=/jedata/jemotor/model/1208_TAVLA_test --data.repo_id=lerobot/test --no_wandb_enabled --overwrite

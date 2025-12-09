@@ -99,7 +99,7 @@ def create_dataset(data_config: _config.DataConfig, model_config: _model.BaseMod
     else:
         dataset_class = lerobot_dataset.MultiLeRobotDataset
     # NOTE here we assume all repos have the same fps.
-    dataset_meta = lerobot_dataset.LeRobotDatasetMetadata(repo_id[0] if isinstance(repo_id, list) else repo_id, local_files_only=data_config.local_files_only)
+    dataset_meta = lerobot_dataset.LeRobotDatasetMetadata(repo_id[0] if isinstance(repo_id, list) else repo_id, local_files_only=data_config.local_files_only, root = "/jedata/test_1128")
     
     delta_timestamps = {
         **{
@@ -107,15 +107,16 @@ def create_dataset(data_config: _config.DataConfig, model_config: _model.BaseMod
             for key in data_config.action_sequence_keys
         }
     }
-    delta_timestamps["observation.effort"] = [t / dataset_meta.fps for t in data_config.effort_history]
+    delta_timestamps["effort"] = [t / dataset_meta.fps for t in data_config.effort_history]
 
     if model_config.effort_type in (EffortType.EXPERT_FUT, EffortType.EXPERT_HIS_C_FUT, EffortType.EXPERT_HIS_C_L_FUT):
-        delta_timestamps["observation.effort"] += [(t + 1) / dataset_meta.fps for t in range(model_config.action_horizon)]
+        delta_timestamps["effort"] += [(t + 1) / dataset_meta.fps for t in range(model_config.action_horizon)]
     
     dataset = dataset_class(
         repo_id,
         delta_timestamps=delta_timestamps,
         local_files_only=data_config.local_files_only,
+        root = "/jedata/test_1128",
     )
 
     if data_config.prompt_from_task:

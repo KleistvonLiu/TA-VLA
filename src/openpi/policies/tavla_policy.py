@@ -34,6 +34,8 @@ class TavlaInputs(transforms.DataTransformFn):
         # Get the state. We are padding from 14 to the model action dim.
         state = transforms.pad_to_dim(data["state"], self.action_dim)
 
+        state = np.asarray(data["state"][:7])
+    
         in_images = data["images"]
 
         # Assume that base image always exists.

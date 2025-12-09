@@ -165,7 +165,8 @@ class DataConfigFactory(abc.ABC):
 
     def create_base_config(self, assets_dirs: pathlib.Path) -> DataConfig:
         repo_id = self.repo_id if self.repo_id is not tyro.MISSING else None
-        asset_id = self.assets.asset_id or repo_id
+        # asset_id = self.assets.asset_id or repo_id
+        asset_id = "openpi_stats/"  # self.assets.asset_id or repo_id
         return dataclasses.replace(
             self.base_config or DataConfig(),
             repo_id=repo_id,
@@ -361,9 +362,10 @@ class LeRobotTavlaDataConfig(DataConfigFactory):
 
     def __post_init__(self):
         images = {
-            "cam_high": "observation.images.cam_high",
-            "cam_left_wrist": "observation.images.cam_left_wrist",
-            "cam_right_wrist": "observation.images.cam_right_wrist",
+            "cam_high": "camera_01_color_image_raw",
+            "cam_left_wrist": "camera_02_color_image_raw",
+            "cam_right_wrist": "camera_03_color_image_raw",
+            # "camera3": "camera_04_color_image_raw",
         }
         repack_dict = {
             "images": images,
@@ -373,7 +375,7 @@ class LeRobotTavlaDataConfig(DataConfigFactory):
         if self.default_prompt is None:
             repack_dict["prompt"] = "prompt"
         if self.effort_history:
-            repack_dict["effort"] = "observation.effort"
+            repack_dict["effort"] = "effort"
         object.__setattr__(
             self,
             "repack_transforms",
@@ -397,7 +399,7 @@ class LeRobotTavlaDataConfig(DataConfigFactory):
             outputs=[tavla_policy.TavlaOutputs()],
         )
         if self.use_delta_joint_actions:
-            delta_action_mask = _transforms.make_bool_mask(6, -1, 6, -1)
+            delta_action_mask = _transforms.make_bool_mask(6, -1)
             data_transforms = data_transforms.push(
                 inputs=[_transforms.DeltaActions(delta_action_mask)],
                 outputs=[_transforms.AbsoluteActions(delta_action_mask)],
@@ -546,9 +548,9 @@ class TrainConfig:
     batch_size: int = 32
     # Number of workers to use for the data loader. Increasing this number will speed up data loading but
     # will increase memory and CPU usage.
-    num_workers: int = 2
+    num_workers: int = 8
     # Number of train steps (batches) to run.
-    num_train_steps: int = 20_000
+    num_train_steps: int = 30_000
 
     # How often (in steps) to log training metrics.
     log_interval: int = 100
@@ -572,7 +574,7 @@ class TrainConfig:
     # device memory will be reduced but training could potentially be slower.
     # eg. if total device is 4 and fsdp devices is 2; then the model will shard to 2 devices and run
     # data parallel between 2 groups of devices.
-    fsdp_devices: int = 1
+    fsdp_devices: int = 8
 
     @property
     def assets_dirs(self) -> pathlib.Path:
@@ -854,7 +856,7 @@ _CONFIGS = [
         name="pi0_lora_effort_history",
         model=pi0.Pi0Config(paligemma_variant="gemma_2b", action_expert_variant="gemma_300m", effort_type=EffortType.EXPERT_HIS_C),
         data=LeRobotTavlaDataConfig(
-            repo_id="org/repo",
+            assets=AssetsConfig(assets_dir="/jedata/test_1128/"),
             effort_history=tuple((6*i-54 for i in range(10))), # sample 10 frames in 2s
             default_prompt="Pick up the PCB board from the conveyor belt and place it into the yellow container.",
 
@@ -862,7 +864,7 @@ _CONFIGS = [
                 local_files_only=True, # Set to True for local-only datasets.
             ),
         ),
-        weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_base/params"),
+        weight_loader=weight_loaders.CheckpointWeightLoader("/jedata/pi0_base/pi0_base/params/"),
         num_train_steps=30_000,
         freeze_filter=pi0.Pi0Config(
             paligemma_variant="gemma_2b", action_expert_variant="gemma_300m"

@@ -43,7 +43,14 @@ def init_logging():
 
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
-    logger.handlers[0].setFormatter(formatter)
+    # logger.handlers[0].setFormatter(formatter)
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    # Ensure at least one handler exists; some environments do not attach a default handler to the root logger.
+    if not logger.handlers:
+        logger.addHandler(logging.StreamHandler())
+    for handler in logger.handlers:
+        handler.setFormatter(formatter)
 
 
 def init_wandb(config: _config.TrainConfig, *, resuming: bool, log_code: bool = False, enabled: bool = True):

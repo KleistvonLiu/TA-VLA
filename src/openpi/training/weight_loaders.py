@@ -47,13 +47,38 @@ class CheckpointWeightLoader(WeightLoader):
 
     params_path: str
 
+    # def load(self, params: at.Params) -> at.Params:
+    #     # We are loading np.ndarray and relying on the training code to properly convert and shard the params.
+    #     loaded_params = _model.restore_params(download.maybe_download(self.params_path), restore_type=np.ndarray)
+    #     missing_regex = r".*(lora|effort_proj|action_out_proj).*"
+    #     # Add all missing LoRA weights.
+    #     return _merge_params(loaded_params, params, missing_regex=missing_regex)
     def load(self, params: at.Params) -> at.Params:
-        # We are loading np.ndarray and relying on the training code to properly convert and shard the params.
-        loaded_params = _model.restore_params(download.maybe_download(self.params_path), restore_type=np.ndarray)
-        missing_regex = ".*lora.*" if "effort_proj_in" not in params else ".*lora.*|effort_proj.*"
-        # Add all missing LoRA weights.
-        return _merge_params(loaded_params, params, missing_regex=missing_regex)
+        loaded_params = _model.restore_params(
+            download.maybe_download(self.params_path),
+            restore_type=np.ndarray,
+        )
 
+        # 如果你想保持原来的「是否有 effort_proj」分支，可以保留：
+        has_effort = "effort_proj_in" in params  # 如果不是顶层 key，可以用 flatten_dict 再判断
+
+        if has_effort:
+            missing_regex = (
+                ".*lora.*"
+                "|.*effort_proj.*"
+                "|.*action_out_proj.*"
+                "|.*action_in_proj.*"
+                "|.*state_proj.*"
+            )
+        else:
+            missing_regex = (
+                ".*lora.*"
+                "|.*action_out_proj.*"
+                "|.*action_in_proj.*"
+                "|.*state_proj.*"
+            )
+
+        return _merge_params(loaded_params, params, missing_regex=missing_regex)
 
 @dataclasses.dataclass(frozen=True)
 class PaliGemmaWeightLoader(WeightLoader):
@@ -74,6 +99,60 @@ class PaliGemmaWeightLoader(WeightLoader):
         return _merge_params(loaded_params, params, missing_regex=".*")
 
 
+# def _merge_params(loaded_params: at.Params, params: at.Params, *, missing_regex: str) -> at.Params:
+#     """Merges the loaded parameters with the reference parameters.
+
+#     Args:
+#         loaded_params: The parameters to merge.
+#         params: The reference parameters.
+#         missing_regex: A regex pattern for all missing keys that should be merged from the reference parameters.
+
+#     Returns:
+#         A new dictionary with the merged parameters.
+#     """
+#     flat_ref = flax.traverse_util.flatten_dict(params, sep="/")
+#     flat_loaded = flax.traverse_util.flatten_dict(loaded_params, sep="/")
+    
+#     rng = np.random.RandomState(42)
+
+#     # First, take all weights that are a subset of the reference weights.
+#     result = {}
+#     for k, v in flat_loaded.items():
+#         if k in flat_ref:
+#             if v.shape == flat_ref[k].shape:
+#                 result[k] = v.astype(flat_ref[k].dtype)
+#             elif any(name in k for name in ["action_in_proj", "action_out_proj"]):
+#                 ref_shape = flat_ref[k].shape
+#                 ref_dtype = flat_ref[k].dtype
+#                 loaded = v
+#                 logger.info(f"Reshaping weights for {k}: loaded {loaded.shape} -> reference {ref_shape}")
+                
+#                 # kernel (weights)
+#                 if len(ref_shape) == 2 and len(loaded.shape) == 2:
+#                     fan_in = ref_shape[0]
+#                     scale = np.sqrt(2.0 / fan_in) * 0.01
+#                     new_array = rng.normal(0, scale, ref_shape).astype(ref_dtype)
+#                     new_array[:loaded.shape[0], :loaded.shape[1]] = loaded[:loaded.shape[0], :loaded.shape[1]].astype(ref_dtype)
+#                     result[k] = new_array
+#                 # bias
+#                 elif len(ref_shape) == 1 and len(loaded.shape) == 1:
+#                     scale = 0.001
+#                     new_array = rng.normal(0, scale, ref_shape).astype(ref_dtype)
+#                     new_array[:loaded.shape[0]] = loaded[:loaded.shape[0]].astype(ref_dtype)
+#                     result[k] = new_array
+#                 else:
+#                     raise ValueError
+#             else:
+#                 raise ValueError(f"Shape mismatch for {k}: loaded {v.shape} vs reference {flat_ref[k].shape}")
+
+#     # Then, merge any missing weights as defined by the missing regex.
+#     pattern = re.compile(missing_regex)
+#     for k in {k for k in flat_ref if pattern.fullmatch(k)}:
+#         if k not in result:
+#             result[k] = flat_ref[k]
+
+#     return flax.traverse_util.unflatten_dict(result, sep="/")
+
 def _merge_params(loaded_params: at.Params, params: at.Params, *, missing_regex: str) -> at.Params:
     """Merges the loaded parameters with the reference parameters.
 
@@ -87,38 +166,17 @@ def _merge_params(loaded_params: at.Params, params: at.Params, *, missing_regex:
     """
     flat_ref = flax.traverse_util.flatten_dict(params, sep="/")
     flat_loaded = flax.traverse_util.flatten_dict(loaded_params, sep="/")
-    
-    rng = np.random.RandomState(42)
 
     # First, take all weights that are a subset of the reference weights.
     result = {}
     for k, v in flat_loaded.items():
         if k in flat_ref:
+            # 只加载 shape 完全一致的参数
             if v.shape == flat_ref[k].shape:
                 result[k] = v.astype(flat_ref[k].dtype)
-            elif any(name in k for name in ["action_in_proj", "action_out_proj"]):
-                ref_shape = flat_ref[k].shape
-                ref_dtype = flat_ref[k].dtype
-                loaded = v
-                logger.info(f"Reshaping weights for {k}: loaded {loaded.shape} -> reference {ref_shape}")
-                
-                # kernel (weights)
-                if len(ref_shape) == 2 and len(loaded.shape) == 2:
-                    fan_in = ref_shape[0]
-                    scale = np.sqrt(2.0 / fan_in) * 0.01
-                    new_array = rng.normal(0, scale, ref_shape).astype(ref_dtype)
-                    new_array[:loaded.shape[0], :loaded.shape[1]] = loaded[:loaded.shape[0], :loaded.shape[1]].astype(ref_dtype)
-                    result[k] = new_array
-                # bias
-                elif len(ref_shape) == 1 and len(loaded.shape) == 1:
-                    scale = 0.001
-                    new_array = rng.normal(0, scale, ref_shape).astype(ref_dtype)
-                    new_array[:loaded.shape[0]] = loaded[:loaded.shape[0]].astype(ref_dtype)
-                    result[k] = new_array
-                else:
-                    raise ValueError
             else:
-                raise ValueError(f"Shape mismatch for {k}: loaded {v.shape} vs reference {flat_ref[k].shape}")
+                # 跳过 shape 不一致的参数（比如 action_in_proj/kernel）
+                continue
 
     # Then, merge any missing weights as defined by the missing regex.
     pattern = re.compile(missing_regex)
